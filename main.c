@@ -35,10 +35,15 @@ main(void)
   ideinit();       // disk
   if(!ismp)
     timerinit();   // uniprocessor timer
+
+  InitialPriorityTables();
+
   startothers();   // start other processors
   kinit2(P2V(4*1024*1024), P2V(PHYSTOP)); // must come after startothers()
   userinit();      // first user process
   // Finish setting up this processor in mpmain.
+
+
   mpmain();
 }
 
@@ -59,6 +64,7 @@ mpmain(void)
   cprintf("cpu%d: starting\n", cpu->id);
   idtinit();       // load idt register
   xchg(&cpu->started, 1); // tell startothers() we're up
+
   scheduler();     // start running processes
 }
 

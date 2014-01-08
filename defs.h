@@ -7,6 +7,17 @@ struct proc;
 struct spinlock;
 struct stat;
 struct superblock;
+struct processQueue;
+
+//---
+
+typedef int bool;
+#define true 1
+#define false 0
+
+#define nullp 0;
+//----
+
 
 // bio.c
 void            binit(void);
@@ -120,6 +131,23 @@ void            printprocesslist(void);
 int             ps(void);
 void 			SetProcessRunnable(struct proc*);
 int 			InsertToPriorityList(int,struct proc*);
+int				EnqueueProcess(struct processQueue*, struct proc*);
+bool 			IsQueueFull(struct processQueue* queue);
+bool 			IsQueueEmpty(struct processQueue* queue);
+struct proc* 	DequeueProcess(struct processQueue* queue);
+bool 			IsPriorityTableEmpty(int priority);
+int 			InsertToPriorityTable(int priority,struct proc* process);
+struct proc* 	GetNextRunnableProcess(int priority);
+bool 			IsThereANoneEmptyHigherLevelPriorityTable(int currentPriority);
+void 			SwitchToProccess(struct proc* process);
+void 			InitialPriorityTables();
+
+int 			setpriority(int pid,int priority);
+struct proc*    findprocesswithpid(int pid);
+void 			setpriorityforchildren(int parentpid,int priority);
+//int 			findprocesswithparentpid(int pid);
+
+
 
 // swtch.S
 void            swtch(struct context**, struct context*);

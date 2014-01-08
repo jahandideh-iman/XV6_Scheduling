@@ -25,6 +25,13 @@ int uptime(void);
 //changesd
 void printprocesslist(void);
 int ps(void);
+int getpriority(int);
+int setpriority(int,int);
+int nice(int);
+
+
+
+
 //void SetProcessRunnable(struct proc*);
 
 // ulib.c

@@ -10,5 +10,5 @@
 #define MAXARG       32  // max exec arguments
 #define LOGSIZE      10  // max data sectors in on-disk log
 #define PRIORITYLEVELS 5
-#define QUEUELENGTH (NPROC+1)
+#define QUEUE_CAPACITY NPROC
 

@@ -69,6 +69,9 @@ struct proc {
   uint priority;
 };
 
+
+
+
 // Process memory is laid out contiguously, low addresses first:
 //   text
 //   original data and bss

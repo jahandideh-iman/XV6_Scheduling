@@ -100,6 +100,11 @@ extern int sys_write(void);
 extern int sys_uptime(void);
 //changes
 extern int sys_ps(void);
+extern int sys_getpriority(int);
+extern int sys_setpriority(int,int);
+extern int nice(int);
+
+
 
 static int (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
