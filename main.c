@@ -17,6 +17,7 @@ extern char end[]; // first address after kernel loaded from ELF file
 int
 main(void)
 {
+	InitialPriorityTables();
   kinit1(end, P2V(4*1024*1024)); // phys page allocator
   kvmalloc();      // kernel page table
   mpinit();        // collect info about this machine
@@ -36,7 +37,7 @@ main(void)
   if(!ismp)
     timerinit();   // uniprocessor timer
 
-  InitialPriorityTables();
+
 
   startothers();   // start other processors
   kinit2(P2V(4*1024*1024), P2V(PHYSTOP)); // must come after startothers()

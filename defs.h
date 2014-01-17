@@ -142,10 +142,20 @@ bool 			IsThereANoneEmptyHigherLevelPriorityTable(int currentPriority);
 void 			SwitchToProccess(struct proc* process);
 void 			InitialPriorityTables();
 
-int 			setpriority(int pid,int priority);
 struct proc*    findprocesswithpid(int pid);
-void 			setpriorityforchildren(int parentpid,int priority);
-//int 			findprocesswithparentpid(int pid);
+int			 	findprocessinqueuewithpid(struct processQueue* queue,int pid);
+void 			setpriorityforchildren(int parentpid,int diff);
+void 			setpriorityinqueueforchildren(struct processQueue*,int,int);
+void 			setpriority(struct proc* process,int priority);
+int 			setprioritybypid(int pid,int priority);
+int 			nice(int);
+int 			clmap(int number,int down,int up);
+int 			getpriority(int pid);
+void 			removeitemfromqueue(struct processQueue* queue,int index);
+void 			moveToNewQueue(struct proc* process,int newpri,int oldpri);
+void 			checkqueuefornonrunnable();
+void 			showprocessqueuestable();
+
 
 
 

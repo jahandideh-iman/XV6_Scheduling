@@ -100,9 +100,9 @@ extern int sys_write(void);
 extern int sys_uptime(void);
 //changes
 extern int sys_ps(void);
-extern int sys_getpriority(int);
-extern int sys_setpriority(int,int);
-extern int nice(int);
+extern int sys_getpriority(void);
+extern int sys_setprioritybypid(void);
+extern int sys_nice(void);
 
 
 
@@ -129,6 +129,9 @@ static int (*syscalls[])(void) = {
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
 [SYS_ps]      sys_ps,
+[SYS_getpriority]	sys_getpriority,
+[SYS_setprioritybypid]	sys_setprioritybypid,
+[SYS_nice]	  sys_nice,
 };
 
 void

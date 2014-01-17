@@ -23,6 +23,6 @@
 //changes
 #define SYS_ps     22
 #define SYS_getpriority 23
-#define SYS_setpriority 24
+#define SYS_setprioritybypid 24
 #define SYS_nice   25
 

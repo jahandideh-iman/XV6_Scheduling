@@ -97,48 +97,34 @@ sys_ps(void)
 }
 //------------nice, setpriority,getpriority
 int
-sys_getpriority(int pid)
+sys_getpriority()
 {
-	return proc->priority;
+	int pid;
+	if(argint(0, &pid) < 0)
+	    return -1;
+	return getpriority(pid);
+
 }
 
 int
-sys_setpriority(int pid,int priority)
+sys_setprioritybypid()
 {
-	return setpriority(pid,priority);
+	int pid;
+	int priority;
+	if(argint(0, &pid) < 0)
+	    return -1;
+	if(argint(1, &priority) < 0)
+	    return -1;
+	return setprioritybypid(pid,priority);
 }
 
 int
-sys_nice(int value)
+sys_nice()
 {
-	if(value==1)
-	{
-		proc->priority+=1;
-		if(proc->priority<=PRIORITYLEVELS)
-		{
-			return 0;
-		}
-		else
-		{
-			return -1;
-		}
-	}
-	if(value==-1)
-	{
-		proc->priority-=1;
-		if(proc->priority<0)
-				{
-					return -1;
-				}
-				else
-				{
-					return 0;
-				}
-	}
-	else
-	{
-		return -1;
-	}
+	int value;
+	if(argint(0, &value) < 0)
+	    return -1;
+	return nice(value);
 }
 
 

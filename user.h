@@ -26,7 +26,8 @@ int uptime(void);
 void printprocesslist(void);
 int ps(void);
 int getpriority(int);
-int setpriority(int,int);
+//int setpriority(struct proc*,int);
+int setprioritybypid(int,int);
 int nice(int);
 
 

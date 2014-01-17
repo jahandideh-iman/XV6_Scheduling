@@ -13,16 +13,35 @@
 int
 main(int argc, char *argv[])
 {
-  if(fork()==0)
-	  exec("testprocess2",argv);
-  else
-  {
-	  fork();
-	  fork();
-	  while(1)
-	  {
+	int childpid=fork();
 
-	  }
-  }
-  exit();
+
+	if(childpid!=0)
+	{
+		setprioritybypid(childpid,2);
+		int secondChild = fork();
+		if(secondChild!=0)
+		{
+			setprioritybypid(secondChild,1);
+			ps();
+		}
+
+
+	}
+	while(1);
+
+
+/*
+	else
+	{
+		int secondchild=fork();
+		if(secondchild!=0)
+		{
+		}
+	}*/
+//	setprioritybypid(getpid(),2);
+
+
+	//while (1);
+	exit();
 }

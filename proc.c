@@ -47,6 +47,7 @@ allocproc(void) {
 	struct proc *p;
 	char *sp;
 
+
 	acquire(&ptable.lock);
 	for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
 		if (p->state == UNUSED)
@@ -56,6 +57,7 @@ allocproc(void) {
 
 	found: p->state = EMBRYO;
 	p->pid = nextpid++;
+
 	release(&ptable.lock);
 
 	// Allocate kernel stack.
@@ -89,6 +91,7 @@ void userinit(void) {
 	extern char _binary_initcode_start[], _binary_initcode_size[];
 
 	p = allocproc();
+
 	initproc = p;
 	if ((p->pgdir = setupkvm()) == 0)
 		panic("userinit: out of memory?");
@@ -106,6 +109,9 @@ void userinit(void) {
 	safestrcpy(p->name, "initcode", sizeof(p->name));
 	p->cwd = namei("/");
 
+
+	p->parent=0;
+	setpriority(p,0);
 	SetProcessRunnable(p);
 }
 
@@ -158,9 +164,13 @@ int fork(void) {
 			np->ofile[i] = filedup(proc->ofile[i]);
 	np->cwd = idup(proc->cwd);
 
+
 	pid = np->pid;
+
+	setpriority(np,np->parent->priority);
 	SetProcessRunnable(np);
 	safestrcpy(np->name, proc->name, sizeof(proc->name));
+
 	return pid;
 }
 
@@ -255,24 +265,23 @@ int wait(void) {
 //  - eventually that process transfers control
 //      via swtch back to the scheduler.
 void scheduler(void) {
+
 	struct proc *p;
-
 	int priority = 0;
-
-	//TODO: find the correct place for this
-
 
 	for (;;) {
 		// Enable interrupts on this processor.
 		sti();
 		acquire(&ptable.lock);
-		
+		checkqueuefornonrunnable();
+
 		p = GetNextRunnableProcess(priority);
+
 		if( p != 0)
 		{
-
+			cprintf("cpu : %d |selected process:%d |priority:%d \n",cpu->id,p->pid,p->priority);
 			SwitchToProccess(p);
-			ps();
+
 			if(IsThereANoneEmptyHigherLevelPriorityTable(priority))
 				priority= 0; // Start from the highest priority
 		}
@@ -441,35 +450,27 @@ void printprocesslist(void) {
 }
 
 int ps(void) {
-	//static char *states[] = { [UNUSED] "unused", [EMBRYO] "embryo", [SLEEPING
-	//		] "sleep ", [RUNNABLE] "runble", [RUNNING] "run   ", [ZOMBIE
-	//		] "zombie" };
+	static char *states[] = { [UNUSED] "unused", [EMBRYO] "embryo", [SLEEPING
+			] "sleep ", [RUNNABLE] "runble", [RUNNING] "run   ", [ZOMBIE
+			] "zombie" };
 
-	cprintf("#############%i################ \n");
-
+	cprintf("------------------ \n");
+	showprocessqueuestable();
+	return 1;
 	int i;
-	for(i=0;i<5;i++)
+	for(i=0;i<NPROC;i++)
 	{
-		if(!IsQueueEmpty(&priorityTable[i]))
+		if(ptable.proc[i].state!=UNUSED)
 		{
-			int p;
-			for(p=0;p<priorityTable[i].size;p++)
-			{
-				cprintf("process name->%s | process priority->%i \n"
-						,priorityTable[i].proc[p]->name
-						,priorityTable[i].proc[p]->priority);
+			cprintf("pid:%d | name:%s | priority:%d | state:%s|parent:%d \n"
+					,ptable.proc[i].pid
+					,ptable.proc[i].name
+					,ptable.proc[i].priority
+					,states[ptable.proc[i].state]
+					,ptable.proc[i].parent->pid);
 
-			}
 		}
-		else
-		{
-			i=i+1;
-		}
-	 }
-
-
-
-	//cprintf("##########################################");
+	}
 	return 0;
 }
 
@@ -492,7 +493,7 @@ void InitialPriorityTables()
 	for(i = 0 ; i< PRIORITYLEVELS;i++)
 	{
 		priorityTable[i].head = 0;
-		priorityTable[i].tail = QUEUE_CAPACITY-1;   
+		priorityTable[i].tail = 0;
 		priorityTable[i].size=0;
 		priorityTable[i].priority = i;
 	}
@@ -502,14 +503,13 @@ void SetProcessRunnable(struct proc* process)
 {
 	process->state=RUNNABLE;
 	InsertToPriorityTable(process->priority,process);
+	//ps();
 }
 
 int InsertToPriorityTable(int priority,struct proc* process)
 {
 	return EnqueueProcess(&priorityTable[priority],process);
 }
-
-
 
 struct proc* GetNextRunnableProcess(int priority)
 {
@@ -532,23 +532,19 @@ bool IsPriorityTableEmpty(int priority)
 	return (IsQueueEmpty(&priorityTable[priority]));
 }
 
-
-
 /****************************** QUEUE ******************************/
 int EnqueueProcess(struct processQueue* queue, struct proc* process )
 {
 	if(!IsQueueFull(queue))
 	{
-		//queue.proc[queue.tail] = process;
-		//queue.tail = (queue.tail++)%QUEUE_CAPACITY;
-		//return 0;
 		if(queue!=0)
 		{
-			queue->tail=(queue->tail+1)%QUEUE_CAPACITY;
 			queue->proc[queue->tail]=process;
+			queue->tail=(queue->tail+1)%QUEUE_CAPACITY;
 			queue->size=(queue->size)+1;
 			return 0;
 		}
+
 	}
 	return -1;
 }
@@ -568,7 +564,7 @@ struct proc* DequeueProcess(struct processQueue* queue)
 
 bool IsQueueFull(struct processQueue* queue)
 {
-	//return (queue.head == queue.tail);
+
 	return (queue->size>=QUEUE_CAPACITY);
 		
 }
@@ -583,61 +579,207 @@ bool IsQueueEmpty(struct processQueue* queue)
 
 /****************************** /QUEUE ******************************/
 
-int setpriority(int pid,int priority)
+int setprioritybypid(int pid,int priority)
 {
-	if(findprocesswithpid(pid)!=0)
-	{
-		findprocesswithpid(pid)->priority=priority;
-		setpriorityforchildren(pid,priority);
-		return 0;
-	}
-	else
+	if(!(priority>=0 && priority<PRIORITYLEVELS))
 		return -1;
+
+	struct proc* foundprocess;
+	foundprocess=findprocesswithpid(pid);
+	//cprintf("**********************foundprocess priority:%d\n",foundprocess->priority);
+	if(foundprocess!=0)
+	{
+		if(foundprocess->parent!=0&&priority>=foundprocess->parent->priority)
+		{
+			setpriority(foundprocess,priority);
+			return 0;
+		}
+	}
+	return -1;
 }
+
+void setpriority(struct proc* process,int newpriority)
+{
+
+	if(!(newpriority>=0&&newpriority<PRIORITYLEVELS))
+		return ;
+	int diff=newpriority-process->priority;
+	int oldpriority=process->priority;
+	process->priority=newpriority;
+
+	moveToNewQueue(process,newpriority,oldpriority);
+
+	setpriorityforchildren(process->pid,diff);
+}
+
 
 struct proc* findprocesswithpid(int pid)
 {
 	int i;
-	int j;
-	struct proc* foundprocess;
-	for (i=0;i<PRIORITYLEVELS;i++)
+	//cprintf("findprocess with pid functoin : %d \n",pid);
+	//ps();
+	for(i=0;i<NPROC;i++)
 	{
-		for(j=0;j<priorityTable[i].size;j++)
+		if(ptable.proc[i].state!=UNUSED)
 		{
-			if(priorityTable[i].proc[j]->pid==pid)
-			{
-				foundprocess=priorityTable[i].proc[j];
-			}
-			else
-			{
-				foundprocess=nullp;
-			}
+			if(ptable.proc[i].pid==pid)
+				return &ptable.proc[i];
 		}
 	}
-	return foundprocess;
+	return 0;
+}
+int findprocessinqueuewithpid(struct processQueue* queue,int pid)
+{
+	int j;
+	for(j=queue->head;j!=queue->tail;j=(j+1)%QUEUE_CAPACITY)
+	{
+		if(queue->proc[j]->pid==pid)
+		{
+			return j;
+		}
+	}
+	return -1;
+
 }
 
-void setpriorityforchildren(int parentpid,int priority)
+void setpriorityforchildren(int parentpid,int diff)
+{
+	int i;
+
+	for(i=0;i<NPROC;i++)
+	{
+		if(ptable.proc[i].parent!=0 && ptable.proc[i].parent->pid==parentpid)
+			setpriority(&ptable.proc[i],diff+ptable.proc[i].priority);
+	}
+}
+
+void setpriorityinqueueforchildren(struct processQueue* queue,int parentpid,int diff)
+{
+	int i;
+	struct proc* childprocess;
+	cprintf("Queue size is %d\n", queue->size);
+	for(i=queue->head;i!=queue->tail;i=(i+1)%QUEUE_CAPACITY)
+	{
+		cprintf("!!!!!!!!\n");
+		if(queue->proc[i]->parent->pid==parentpid)
+		{
+
+			childprocess=queue->proc[i];
+			setpriority(childprocess,childprocess->priority+diff);
+		}
+	}
+
+}
+
+int nice(int value)
+{
+	int newpriority=proc->priority+value;
+	if(newpriority>PRIORITYLEVELS||newpriority<0)
+		return -1;
+	if(proc->parent!=0&&newpriority>=proc->parent->priority)
+	{
+		setpriority(proc,newpriority);
+		return 0;
+	}
+
+	return -1;
+
+}
+
+int clmap(int number,int down,int up)
+{
+	if(number<down)
+		number=down;
+	else if (number>up)
+		number=up;
+	return number;
+
+}
+
+int getpriority(int pid)
+{
+
+	struct proc* process=findprocesswithpid(pid);
+	//cprintf("pid:%d \n",process->pid);
+	if(process==0)
+		return -1;
+	//cprintf("process found \n");
+	return process->priority;
+}
+
+void removeitemfromqueue(struct processQueue* queue,int index)
+{
+	int i;
+	for(i=index;i!=queue->tail;i=(i+1)%QUEUE_CAPACITY)
+	{
+		queue->proc[i]=queue->proc[i+1];
+	}
+	queue->tail=(queue->tail-1)%QUEUE_CAPACITY;
+	queue->size-=1;
+}
+
+void moveToNewQueue(struct proc* process,int newpri,int oldpri)
+{
+	int index;
+	index=findprocessinqueuewithpid(&priorityTable[oldpri],process->pid);
+	if(index!=-1)
+	{
+		removeitemfromqueue(&priorityTable[oldpri],index);
+		EnqueueProcess(&priorityTable[newpri],process);
+	}
+}
+
+void checkqueuefornonrunnable()
 {
 	int i;
 	int j;
-	struct proc* childprocess;
-	for (i=0;i<PRIORITYLEVELS;i++)
+	for(i = 0 ; i< PRIORITYLEVELS;i++)
 	{
-		for(j=0;j<priorityTable[i].size;j++)
+		for(j=priorityTable[i].head;j!=priorityTable[i].tail;)
 		{
-			if(priorityTable[i].proc[j]->parent->pid==parentpid)
-			{
-				childprocess=priorityTable[i].proc[j];
-				childprocess->priority=priority;
-				setpriorityforchildren(childprocess->pid,priority);
+			if(priorityTable[i].proc[j]->state!=RUNNABLE)
+				removeitemfromqueue(&priorityTable[i],j);
+			else
+				j=(j+1)%QUEUE_CAPACITY;
+		}
+	}
+}
 
+
+void showprocessqueuestable()
+{
+	/*static char *states[] = { [UNUSED] "unused", [EMBRYO] "embryo", [SLEEPING
+				] "sleep ", [RUNNABLE] "runble", [RUNNING] "run   ", [ZOMBIE
+				] "zombie" };
+*/
+	int i;
+	int j;
+	//char* wht="init";
+	for(i = 0 ; i< PRIORITYLEVELS;i++)
+	{
+		cprintf("*****table %d******\n",i);
+		for(j=priorityTable[i].head;j!=priorityTable[i].tail;j=(j+1)%QUEUE_CAPACITY)
+		{
+			if (priorityTable[i].proc[j]->parent!=0)
+			{
+
+				cprintf("pid:%d |name:%s|piority:%d|parent:%d\n",
+						priorityTable[i].proc[j]->pid,
+						priorityTable[i].proc[j]->name,
+						priorityTable[i].proc[j]->priority,
+						priorityTable[i].proc[j]->parent->pid);
 			}
 			else
 			{
-				childprocess=nullp;
+				cprintf("pid:%d |name:%s|piority:%d \n",
+										priorityTable[i].proc[j]->pid,
+										priorityTable[i].proc[j]->name,
+										priorityTable[i].proc[j]->priority);
+
 			}
 		}
 	}
-
 }
+
+
+
